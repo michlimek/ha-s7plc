@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from hashlib import sha1
+from hashlib import sha256
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -163,7 +163,7 @@ def get_entity_device_info(
     if not device_name:
         return default_device_info
 
-    digest = sha1(device_name.casefold().encode("utf-8")).hexdigest()[:16]
+    digest = sha256(device_name.casefold().encode("utf-8")).hexdigest()[:16]
     return DeviceInfo(
         identifiers={(DOMAIN, f"{device_id}:device:{digest}")},
         name=device_name,
