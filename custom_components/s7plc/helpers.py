@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from hashlib import sha1
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -150,6 +151,26 @@ def get_coordinator_and_device_info(
     )
 
     return coordinator, device_info, device_id
+
+
+def get_entity_device_info(
+    default_device_info: DeviceInfo,
+    device_id: str,
+    item: dict,
+) -> DeviceInfo:
+    """Return the root PLC device or a named child device for an entity."""
+    device_name = str(item.get("device_name", "")).strip()
+    if not device_name:
+        return default_device_info
+
+    digest = sha1(device_name.casefold().encode("utf-8")).hexdigest()[:16]
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{device_id}:device:{digest}")},
+        name=device_name,
+        manufacturer="Siemens",
+        model="S7 PLC device",
+        via_device=(DOMAIN, device_id),
+    )
 
 
 def default_entity_name(address: str | None) -> str | None:
