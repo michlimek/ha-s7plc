@@ -1889,19 +1889,22 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
+
+        def _copy_items(option_key: str) -> list[dict[str, Any]]:
+            """Copy entity dictionaries before editing options in the flow."""
+            return [dict(item) for item in config_entry.options.get(option_key, [])]
+
         self._options = {
-            CONF_SENSORS: list(config_entry.options.get(CONF_SENSORS, [])),
-            CONF_BINARY_SENSORS: list(
-                config_entry.options.get(CONF_BINARY_SENSORS, [])
-            ),
-            CONF_SWITCHES: list(config_entry.options.get(CONF_SWITCHES, [])),
-            CONF_COVERS: list(config_entry.options.get(CONF_COVERS, [])),
-            CONF_LIGHTS: list(config_entry.options.get(CONF_LIGHTS, [])),
-            CONF_BUTTONS: list(config_entry.options.get(CONF_BUTTONS, [])),
-            CONF_NUMBERS: list(config_entry.options.get(CONF_NUMBERS, [])),
-            CONF_TEXTS: list(config_entry.options.get(CONF_TEXTS, [])),
-            CONF_CLIMATES: list(config_entry.options.get(CONF_CLIMATES, [])),
-            CONF_ENTITY_SYNC: list(config_entry.options.get(CONF_ENTITY_SYNC, [])),
+            CONF_SENSORS: _copy_items(CONF_SENSORS),
+            CONF_BINARY_SENSORS: _copy_items(CONF_BINARY_SENSORS),
+            CONF_SWITCHES: _copy_items(CONF_SWITCHES),
+            CONF_COVERS: _copy_items(CONF_COVERS),
+            CONF_LIGHTS: _copy_items(CONF_LIGHTS),
+            CONF_BUTTONS: _copy_items(CONF_BUTTONS),
+            CONF_NUMBERS: _copy_items(CONF_NUMBERS),
+            CONF_TEXTS: _copy_items(CONF_TEXTS),
+            CONF_CLIMATES: _copy_items(CONF_CLIMATES),
+            CONF_ENTITY_SYNC: _copy_items(CONF_ENTITY_SYNC),
         }
         self._action: str | None = None  # "add" | "remove" | "edit"
         self._edit_target: tuple[str, int] | None = None

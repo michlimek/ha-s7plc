@@ -140,6 +140,33 @@ def test_bulk_device_assignment_updates_multiple_entity_types():
     )
 
 
+def test_bulk_device_assignment_does_not_mutate_current_entry_options():
+    options = {
+        const.CONF_SENSORS: [
+            {const.CONF_ADDRESS: "DB1,W0", CONF_NAME: "Temperatura"}
+        ]
+    }
+    flow = make_options_flow(options=options)
+
+    run_flow(
+        flow.async_step_assign_devices({const.CONF_DEVICE_GROUP: "Kotłownia"})
+    )
+    result = run_flow(
+        flow.async_step_assign_device_entities(
+            {config_flow.DEVICE_GROUP_ITEMS_FIELD: ["s:0"]}
+        )
+    )
+
+    assert result["type"] == "create_entry"
+    assert const.CONF_DEVICE_GROUP not in flow._config_entry.options[
+        const.CONF_SENSORS
+    ][0]
+    assert (
+        result["kwargs"]["data"][const.CONF_SENSORS][0][const.CONF_DEVICE_GROUP]
+        == "Kotłownia"
+    )
+
+
 def test_bulk_device_assignment_rejects_unknown_item_key():
     flow = make_options_flow(
         options={const.CONF_SENSORS: [{const.CONF_ADDRESS: "DB1,W0"}]}
