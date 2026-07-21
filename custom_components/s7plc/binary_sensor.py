@@ -22,7 +22,7 @@ from .const import (
     CONF_AVAILABILITY_INVERT,
 )
 from .entity import S7BaseEntity
-from .helpers import default_entity_name, get_coordinator_and_device_info
+from .helpers import default_entity_name, get_coordinator_and_device_info, get_entity_device_info
 
 # Coordinator is used to centralize data updates
 PARALLEL_UPDATES = 0
@@ -69,7 +69,7 @@ async def async_setup_entry(
                 coord,
                 name,
                 unique_id,
-                device_info,
+                get_entity_device_info(device_info, device_id, item),
                 topic,
                 address,
                 device_class,
