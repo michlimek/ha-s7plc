@@ -847,6 +847,53 @@ def _get_suggested_values(result):
     return suggested
 
 
+def test_add_error_preserves_all_entered_values():
+    """Validation errors must not clear a partially completed add form."""
+    flow = make_options_flow(
+        options={const.CONF_SENSORS: [{const.CONF_ADDRESS: "DB1,W0"}]}
+    )
+    user_input = {
+        const.CONF_ADDRESS: "DB1,W0",
+        CONF_NAME: "Temperatura zasilania",
+        const.CONF_DEVICE_CLASS: "temperature",
+        const.CONF_UNIT_OF_MEASUREMENT: "°C",
+        const.CONF_DEVICE_GROUP: "Kotłownia",
+        "add_another": True,
+    }
+
+    result = run_flow(flow.async_step_sensors(user_input))
+
+    assert result["type"] == "form"
+    assert result["kwargs"]["errors"] == {"base": "duplicate_entry"}
+    assert _get_suggested_values(result) == user_input
+
+
+def test_edit_error_preserves_all_entered_values():
+    """Validation errors must not restore stale values in an edit form."""
+    flow = make_options_flow(
+        options={
+            const.CONF_SENSORS: [
+                {const.CONF_ADDRESS: "DB1,W0", CONF_NAME: "Temperatura"},
+                {const.CONF_ADDRESS: "DB1,W2", CONF_NAME: "Ciśnienie"},
+            ]
+        }
+    )
+    flow._edit_target = ("s", 1)
+    user_input = {
+        const.CONF_ADDRESS: "DB1,W0",
+        CONF_NAME: "Ciśnienie zasilania",
+        const.CONF_DEVICE_CLASS: "pressure",
+        const.CONF_UNIT_OF_MEASUREMENT: "bar",
+        const.CONF_DEVICE_GROUP: "Sprężarkownia",
+    }
+
+    result = run_flow(flow.async_step_edit_sensor(user_input))
+
+    assert result["type"] == "form"
+    assert result["kwargs"]["errors"] == {"base": "duplicate_entry"}
+    assert _get_suggested_values(result) == user_input
+
+
 def test_add_another_sensor_copies_values():
     """When add_another is checked, the next sensor form should pre-fill previous values."""
     flow = make_options_flow(options={const.CONF_SENSORS: []})
