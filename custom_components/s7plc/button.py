@@ -17,7 +17,7 @@ from .const import (
     DEFAULT_PULSE_DURATION,
 )
 from .entity import S7BaseEntity
-from .helpers import default_entity_name, get_coordinator_and_device_info
+from .helpers import default_entity_name, get_coordinator_and_device_info, get_entity_device_info
 
 PARALLEL_UPDATES = 1
 
@@ -40,7 +40,7 @@ async def async_setup_entry(
         unique_id = f"{device_id}:button:{address}"
         button_pulse = item.get(CONF_BUTTON_PULSE, DEFAULT_PULSE_DURATION)
         entities.append(
-            S7Button(coord, name, unique_id, device_info, address, button_pulse, area)
+            S7Button(coord, name, unique_id, get_entity_device_info(device_info, device_id, item), address, button_pulse, area)
         )
 
     if entities:
