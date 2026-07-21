@@ -31,6 +31,7 @@ from .helpers import (
     DEVICE_CLASS_DEFAULT_UNITS,
     default_entity_name,
     get_coordinator_and_device_info,
+    get_entity_device_info,
     inverse_scale_value,
     scale_value,
 )
@@ -74,7 +75,7 @@ async def async_setup_entry(
                 coord,
                 name,
                 unique_id,
-                device_info,
+                get_entity_device_info(device_info, device_id, item),
                 topic,
                 address,
                 command_address,
