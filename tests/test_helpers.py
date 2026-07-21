@@ -7,6 +7,7 @@ from custom_components.s7plc.helpers import (
     build_entity_area_map,
     build_expected_unique_ids,
     get_coordinator_and_device_info,
+    get_entity_device_info,
     default_entity_name,
     parse_pulse_duration,
     scale_value,
@@ -84,6 +85,35 @@ def test_get_coordinator_and_device_info_different_names():
     
     assert device_info["name"] == "Production Line 1"
     assert device_id == "prod-line-1"
+
+
+def test_get_entity_device_info_without_group_returns_root_device():
+    """An entity without a group remains assigned to the root PLC device."""
+    root_device_info = {"identifiers": {(DOMAIN, "test-device-id")}}
+
+    assert (
+        get_entity_device_info(root_device_info, "test-device-id", {})
+        is root_device_info
+    )
+
+
+def test_get_entity_device_info_creates_named_child_device():
+    """An entity group creates a named child device linked to the PLC."""
+    root_device_info = {"identifiers": {(DOMAIN, "test-device-id")}}
+
+    device_info = get_entity_device_info(
+        root_device_info,
+        "test-device-id",
+        {"device_group": "Kotłownia"},
+    )
+
+    assert device_info["name"] == "Kotłownia"
+    assert device_info["manufacturer"] == "Siemens"
+    assert device_info["model"] == "S7 PLC child device"
+    assert device_info["via_device"] == (DOMAIN, "test-device-id")
+    assert device_info["identifiers"] == {
+        (DOMAIN, "test-device-id:device:ed6159fa3258c269")
+    }
 
 
 # ---------------------------------------------------------------------------
