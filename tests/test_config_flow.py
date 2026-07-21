@@ -76,6 +76,88 @@ def test_add_step_routes_to_selected_handler(monkeypatch):
     assert result["step_id"] == "sensors"
 
 
+def test_setup_entities_menu_includes_bulk_device_assignment():
+    flow = make_options_flow()
+
+    result = run_flow(flow.async_step_setup_entities())
+
+    assert result["type"] == "menu"
+    assert result["kwargs"]["menu_options"] == [
+        "add",
+        "edit",
+        "assign_devices",
+        "remove",
+    ]
+
+
+def test_bulk_device_assignment_updates_multiple_entity_types():
+    options = {
+        const.CONF_SENSORS: [
+            {
+                const.CONF_ADDRESS: "DB1,W0",
+                CONF_NAME: "Temperatura",
+                const.CONF_DEVICE_GROUP: "Kotłownia",
+            },
+            {const.CONF_ADDRESS: "DB1,W2", CONF_NAME: "Ciśnienie"},
+        ],
+        const.CONF_NUMBERS: [
+            {
+                const.CONF_ADDRESS: "DB1,W4",
+                CONF_NAME: "Nastawa",
+                const.CONF_DEVICE_GROUP: "Sprężarkownia",
+            }
+        ],
+    }
+    flow = make_options_flow(options=options)
+
+    selection = run_flow(
+        flow.async_step_assign_devices(
+            {const.CONF_DEVICE_GROUP: "  kotŁOWNIA  "}
+        )
+    )
+
+    assert selection["type"] == "form"
+    assert selection["kwargs"]["step_id"] == "assign_device_entities"
+    assert selection["kwargs"]["description_placeholders"] == {
+        "device_group": "Kotłownia"
+    }
+
+    result = run_flow(
+        flow.async_step_assign_device_entities(
+            {config_flow.DEVICE_GROUP_ITEMS_FIELD: ["s:1", "nm:0"]}
+        )
+    )
+
+    assert result["type"] == "create_entry"
+    assert const.CONF_DEVICE_GROUP not in flow._options[const.CONF_SENSORS][0]
+    assert (
+        flow._options[const.CONF_SENSORS][1][const.CONF_DEVICE_GROUP]
+        == "Kotłownia"
+    )
+    assert (
+        flow._options[const.CONF_NUMBERS][0][const.CONF_DEVICE_GROUP]
+        == "Kotłownia"
+    )
+
+
+def test_bulk_device_assignment_rejects_unknown_item_key():
+    flow = make_options_flow(
+        options={const.CONF_SENSORS: [{const.CONF_ADDRESS: "DB1,W0"}]}
+    )
+    run_flow(
+        flow.async_step_assign_devices({const.CONF_DEVICE_GROUP: "Kotłownia"})
+    )
+
+    result = run_flow(
+        flow.async_step_assign_device_entities(
+            {config_flow.DEVICE_GROUP_ITEMS_FIELD: ["s:999"]}
+        )
+    )
+
+    assert result["type"] == "form"
+    assert result["kwargs"]["errors"] == {"base": "invalid_selection"}
+
+
 def test_sanitize_and_normalize_address():
     flow = make_options_flow()
 

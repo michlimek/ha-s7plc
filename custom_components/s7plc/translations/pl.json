@@ -110,7 +110,28 @@
         "menu_options": {
           "add": "Dodaj encje",
           "edit": "Edytuj encje",
+          "assign_devices": "Przypisz encje do urządzeń",
           "remove": "Usuń encje"
+        }
+      },
+      "assign_devices": {
+        "title": "Wybierz urządzenie",
+        "description": "Wybierz istniejące urządzenie podrzędne albo wpisz nazwę nowego.",
+        "data": {
+          "device_group": "Urządzenie"
+        },
+        "data_description": {
+          "device_group": "Encje z taką samą nazwą zostaną pokazane jako jedno urządzenie podrzędne tego PLC."
+        }
+      },
+      "assign_device_entities": {
+        "title": "Przypisz encje",
+        "description": "Zaznacz encje, które mają należeć do urządzenia **{device_group}**. Odznaczenie usuwa encję z tego urządzenia. Zaznaczenie encji przypisanej gdzie indziej przenosi ją tutaj.",
+        "data": {
+          "device_group_items": "Encje"
+        },
+        "data_description": {
+          "device_group_items": "Wyszukaj i zaznacz wiele encji, a następnie zapisz je jednocześnie."
         }
       },
       "manage_configuration": {
@@ -887,6 +908,7 @@
       "already_configured": "Inna konfiguracja PLC używa już tych parametrów połączenia.",
       "invalid_json": "Nieprawidłowy format JSON.",
       "invalid_selection": "Wybierz prawidłowy typ encji.",
+      "invalid_device_group": "Podaj nazwę urządzenia.",
       "min_max_required_for_real": "Wartość minimalna i maksymalna jest wymagana dla danych typu (REAL / LREAL).",
       "scale_raw_requires_min_max": "Skalowanie wymaga podania wartości minimalnej i maksymalnej.",
       "scale_requires_all_four": "Funkcja skalowanie wymaga wszystkich czterech parametrów: wartość wejściowa min./maks. oraz wartość wyjściowa min./maks.",

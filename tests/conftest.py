@@ -593,10 +593,11 @@ class SelectOptionDict(dict):  # pragma: no cover - simple stub
 
 
 class SelectSelectorConfig:  # pragma: no cover - simple stub
-    def __init__(self, options=None, custom_value=False, mode=None):
+    def __init__(self, options=None, custom_value=False, mode=None, multiple=False):
         self.options = options or []
         self.custom_value = custom_value
         self.mode = mode
+        self.multiple = multiple
 
 
 class SelectSelector:  # pragma: no cover - simple stub
@@ -1008,6 +1009,11 @@ class _Schema:  # pragma: no cover - simple stub
 
     def __call__(self, value):
         return value
+
+    def extend(self, schema):
+        extended = dict(self.schema)
+        extended.update(schema)
+        return _Schema(extended)
 
 
 class _Marker(str):  # pragma: no cover - base class matching voluptuous.Marker

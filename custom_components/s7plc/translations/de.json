@@ -110,7 +110,28 @@
         "menu_options": {
           "add": "Entitäten hinzufügen",
           "edit": "Entitäten bearbeiten",
+          "assign_devices": "Entitäten Geräten zuordnen",
           "remove": "Entitäten entfernen"
+        }
+      },
+      "assign_devices": {
+        "title": "Gerät auswählen",
+        "description": "Wählen Sie ein vorhandenes untergeordnetes Gerät aus oder geben Sie einen Namen für ein neues ein.",
+        "data": {
+          "device_group": "Gerät"
+        },
+        "data_description": {
+          "device_group": "Entitäten mit demselben Namen werden unter einem untergeordneten Gerät dieser SPS angezeigt."
+        }
+      },
+      "assign_device_entities": {
+        "title": "Entitäten zuordnen",
+        "description": "Wählen Sie die Entitäten aus, die zu **{device_group}** gehören sollen. Durch Abwählen wird die Zuordnung entfernt. Eine bereits anders zugeordnete Entität wird hierher verschoben.",
+        "data": {
+          "device_group_items": "Entitäten"
+        },
+        "data_description": {
+          "device_group_items": "Suchen und wählen Sie mehrere Entitäten aus und speichern Sie sie gemeinsam."
         }
       },
       "manage_configuration": {
@@ -887,6 +908,7 @@
       "already_configured": "Ein anderer S7-SPS-Eintrag verwendet bereits diese Verbindungsparameter.",
       "invalid_json": "Ungültige JSON-Nutzlast.",
       "invalid_selection": "Wählen Sie einen gültigen Elementtyp aus.",
+      "invalid_device_group": "Geben Sie einen Gerätenamen ein.",
       "min_max_required_for_real": "Mindest- und Maximalwerte sind für REAL- und LREAL-Datentypen erforderlich.",
       "scale_raw_requires_min_max": "Wenn Skalierungs-Rohmin/-max gesetzt sind, müssen auch Min-Wert und Max-Wert angegeben werden.",
       "scale_requires_all_four": "Die Skalierung erfordert alle vier Parameter: Minimalwert, Maximalwert, Roh-Min und Roh-Max.",

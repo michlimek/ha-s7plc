@@ -1103,6 +1103,8 @@ _ADD_STEP_TO_PREFIX: dict[str, str] = {
     info.add_step_id: prefix for prefix, info in ENTITY_TYPE_REGISTRY.items()
 }
 
+DEVICE_GROUP_ITEMS_FIELD = "device_group_items"
+
 del _reg  # cleanup namespace
 
 
@@ -1904,6 +1906,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
         self._action: str | None = None  # "add" | "remove" | "edit"
         self._edit_target: tuple[str, int] | None = None
         self._last_add_input: dict[str, Any] | None = None
+        self._selected_device_group: str | None = None
 
     def _get_area_selector(self) -> selector.SelectSelector:
         """Get area selector with dynamic area list."""
@@ -1915,17 +1918,33 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
             )
         )
 
+    def _get_device_groups(self) -> list[str]:
+        """Return unique, normalized PLC child-device names."""
+        groups: dict[str, str] = {}
+        for option_key in OPTION_KEYS:
+            for item in self._options.get(option_key, []):
+                group = str(item.get(CONF_DEVICE_GROUP, "")).strip()
+                if group:
+                    groups.setdefault(group.casefold(), group)
+        return sorted(groups.values(), key=str.casefold)
+
+    def _normalize_device_group(self, value: Any | None) -> str:
+        """Trim a device name and preserve spelling used by an existing group."""
+        group = str(value or "").strip()
+        if not group:
+            return ""
+        return next(
+            (
+                existing
+                for existing in self._get_device_groups()
+                if existing.casefold() == group.casefold()
+            ),
+            group,
+        )
+
     def _get_device_group_selector(self) -> selector.SelectSelector:
         """Return existing PLC child devices and allow entering a new one."""
-        groups = sorted(
-            {
-                str(item.get(CONF_DEVICE_GROUP, "")).strip()
-                for option_key in OPTION_KEYS
-                for item in self._options.get(option_key, [])
-                if str(item.get(CONF_DEVICE_GROUP, "")).strip()
-            },
-            key=str.casefold,
-        )
+        groups = self._get_device_groups()
         return selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=[
@@ -3544,8 +3563,126 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
             menu_options=[
                 "add",  # add new entities
                 "edit",  # edit existing entities
+                "assign_devices",  # assign many entities to a child device
                 "remove",  # remove existing entities
             ],
+        )
+
+    def _get_item_by_key(self, key: str) -> dict[str, Any] | None:
+        """Return a configured entity item for a key from _build_items_map."""
+        parsed = self._parse_item_key(key)
+        if parsed is None:
+            return None
+        prefix, index = parsed
+        info = ENTITY_TYPE_REGISTRY.get(prefix)
+        if info is None:
+            return None
+        items = self._options.get(info.option_key, [])
+        if not 0 <= index < len(items):
+            return None
+        return items[index]
+
+    async def async_step_assign_devices(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Select an existing or new child device for bulk assignment."""
+        if not self._build_items_map():
+            return self.async_show_form(
+                step_id="assign_devices",
+                data_schema=vol.Schema({}),
+                errors={"base": "no_items"},
+            )
+
+        data_schema = vol.Schema(
+            {vol.Required(CONF_DEVICE_GROUP): self._get_device_group_selector()}
+        )
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            device_group = self._normalize_device_group(
+                user_input.get(CONF_DEVICE_GROUP)
+            )
+            if not device_group:
+                errors["base"] = "invalid_device_group"
+            else:
+                self._selected_device_group = device_group
+                return await self.async_step_assign_device_entities()
+
+        return self.async_show_form(
+            step_id="assign_devices",
+            data_schema=data_schema,
+            errors=errors,
+        )
+
+    async def async_step_assign_device_entities(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Assign multiple configured entities to the selected child device."""
+        device_group = self._selected_device_group
+        if not device_group:
+            return await self.async_step_assign_devices()
+
+        items = self._build_items_map()
+        selected_by_default: list[str] = []
+        select_options: list[selector.SelectOptionDict] = []
+
+        for key, label in items.items():
+            item = self._get_item_by_key(key)
+            if item is None:
+                continue
+            current_group = str(item.get(CONF_DEVICE_GROUP, "")).strip()
+            if current_group.casefold() == device_group.casefold():
+                selected_by_default.append(key)
+            elif current_group:
+                label = f"{label} — {current_group}"
+            select_options.append(selector.SelectOptionDict(value=key, label=label))
+
+        data_schema = vol.Schema(
+            {
+                vol.Optional(
+                    DEVICE_GROUP_ITEMS_FIELD,
+                    default=selected_by_default,
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=select_options,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }
+        )
+
+        if user_input is not None:
+            raw_selected = user_input.get(DEVICE_GROUP_ITEMS_FIELD, [])
+            if isinstance(raw_selected, str):
+                raw_selected = [raw_selected]
+            selected = {str(key) for key in raw_selected}
+
+            if not selected.issubset(items):
+                return self.async_show_form(
+                    step_id="assign_device_entities",
+                    data_schema=data_schema,
+                    errors={"base": "invalid_selection"},
+                    description_placeholders={"device_group": device_group},
+                )
+
+            for key in items:
+                item = self._get_item_by_key(key)
+                if item is None:
+                    continue
+                current_group = str(item.get(CONF_DEVICE_GROUP, "")).strip()
+                if key in selected:
+                    item[CONF_DEVICE_GROUP] = device_group
+                elif current_group.casefold() == device_group.casefold():
+                    item.pop(CONF_DEVICE_GROUP, None)
+
+            self._selected_device_group = None
+            return self.async_create_entry(title="", data=self._options)
+
+        return self.async_show_form(
+            step_id="assign_device_entities",
+            data_schema=data_schema,
+            description_placeholders={"device_group": device_group},
         )
 
     # ====== STEP: manage configuration (submenu) ======

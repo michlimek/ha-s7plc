@@ -110,7 +110,28 @@
         "menu_options": {
           "add": "Aggiungi entità",
           "edit": "Modifica entità",
+          "assign_devices": "Assegna entità ai dispositivi",
           "remove": "Rimuovi entità"
+        }
+      },
+      "assign_devices": {
+        "title": "Scegli dispositivo",
+        "description": "Seleziona un dispositivo secondario esistente o inserisci il nome di uno nuovo.",
+        "data": {
+          "device_group": "Dispositivo"
+        },
+        "data_description": {
+          "device_group": "Le entità con lo stesso nome vengono visualizzate sotto un unico dispositivo secondario di questo PLC."
+        }
+      },
+      "assign_device_entities": {
+        "title": "Assegna entità",
+        "description": "Seleziona le entità che devono appartenere a **{device_group}**. Deselezionandole vengono rimosse da questo dispositivo. Un'entità assegnata altrove verrà spostata qui.",
+        "data": {
+          "device_group_items": "Entità"
+        },
+        "data_description": {
+          "device_group_items": "Cerca e seleziona più entità, quindi salvale insieme."
         }
       },
       "manage_configuration": {
@@ -887,6 +908,7 @@
       "already_configured": "Un'altra configurazione S7 PLC utilizza già questi parametri di connessione.",
       "invalid_json": "Payload JSON non valido.",
       "invalid_selection": "Seleziona un tipo di elemento valido.",
+      "invalid_device_group": "Inserisci un nome per il dispositivo.",
       "min_max_required_for_real": "I valori minimo e massimo sono obbligatori per i tipi di dati REAL e LREAL.",
       "scale_raw_requires_min_max": "Se si impostano scala raw min/max, è obbligatorio specificare anche min value e max value.",
       "scale_requires_all_four": "La scalatura richiede tutti e quattro i parametri: valore minimo, valore massimo, scala raw min e scala raw max.",

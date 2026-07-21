@@ -110,7 +110,28 @@
         "menu_options": {
           "add": "Add entities",
           "edit": "Edit entities",
+          "assign_devices": "Assign entities to devices",
           "remove": "Remove entities"
+        }
+      },
+      "assign_devices": {
+        "title": "Choose device",
+        "description": "Select an existing child device or enter a name for a new one.",
+        "data": {
+          "device_group": "Device"
+        },
+        "data_description": {
+          "device_group": "Entities assigned to the same name appear under one child device of this PLC."
+        }
+      },
+      "assign_device_entities": {
+        "title": "Assign entities",
+        "description": "Select the entities that should belong to **{device_group}**. Clearing an entity removes it from this device. Selecting an entity assigned elsewhere moves it here.",
+        "data": {
+          "device_group_items": "Entities"
+        },
+        "data_description": {
+          "device_group_items": "Select and search multiple entities, then save once."
         }
       },
       "manage_configuration": {
@@ -887,6 +908,7 @@
       "already_configured": "Another S7 PLC entry already uses these connection parameters.",
       "invalid_json": "Invalid JSON payload.",
       "invalid_selection": "Select a valid item type.",
+      "invalid_device_group": "Enter a device name.",
       "min_max_required_for_real": "Minimum and maximum values are required for REAL and LREAL data types.",
       "scale_raw_requires_min_max": "Scale raw min/max require both min value and max value to be set.",
       "scale_requires_all_four": "Scaling requires all four parameters: min value, max value, scale raw min and scale raw max.",

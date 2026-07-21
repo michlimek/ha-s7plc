@@ -110,7 +110,28 @@
         "menu_options": {
           "add": "Přidat entity",
           "edit": "Upravit entity",
+          "assign_devices": "Přiřadit entity k zařízením",
           "remove": "Odebrat entity"
+        }
+      },
+      "assign_devices": {
+        "title": "Vyberte zařízení",
+        "description": "Vyberte existující podřízené zařízení nebo zadejte název nového.",
+        "data": {
+          "device_group": "Zařízení"
+        },
+        "data_description": {
+          "device_group": "Entity se stejným názvem se zobrazí pod jedním podřízeným zařízením tohoto PLC."
+        }
+      },
+      "assign_device_entities": {
+        "title": "Přiřadit entity",
+        "description": "Vyberte entity, které mají patřit k zařízení **{device_group}**. Zrušením výběru přiřazení odeberete. Entita přiřazená jinam se přesune sem.",
+        "data": {
+          "device_group_items": "Entity"
+        },
+        "data_description": {
+          "device_group_items": "Vyhledejte a vyberte více entit a uložte je najednou."
         }
       },
       "manage_configuration": {
@@ -887,6 +908,7 @@
       "already_configured": "Jiný záznam S7 PLC už používá tyto parametry připojení.",
       "invalid_json": "Neplatný JSON.",
       "invalid_selection": "Vyberte platný typ položky.",
+      "invalid_device_group": "Zadejte název zařízení.",
       "min_max_required_for_real": "Pro datové typy REAL a LREAL jsou vyžadovány minimální a maximální hodnoty.",
       "scale_raw_requires_min_max": "Pokud je nastaven surový rozsah škálování, musí být zadány také minimální a maximální hodnota.",
       "scale_requires_all_four": "Škálování vyžaduje všechny čtyři parametry: minimální hodnotu, maximální hodnotu, surový min a surový max.",
