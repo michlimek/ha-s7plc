@@ -1915,6 +1915,28 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
             )
         )
 
+    def _get_device_group_selector(self) -> selector.SelectSelector:
+        """Return existing PLC child devices and allow entering a new one."""
+        groups = sorted(
+            {
+                str(item.get(CONF_DEVICE_GROUP, "")).strip()
+                for option_key in OPTION_KEYS
+                for item in self._options.get(option_key, [])
+                if str(item.get(CONF_DEVICE_GROUP, "")).strip()
+            },
+            key=str.casefold,
+        )
+        return selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=group, label=group)
+                    for group in groups
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
+
     @staticmethod
     def _sanitize_address(address: Any | None) -> str | None:
         """Return a trimmed string representation of an address."""
@@ -2126,7 +2148,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
         """Generic handler for *all* entity-add steps."""
         info = ENTITY_TYPE_REGISTRY[_ADD_STEP_TO_PREFIX[step_id]]
         data_schema = info.build_add_schema(self).extend(
-            {vol.Optional(CONF_DEVICE_GROUP): selector.TextSelector()}
+            {vol.Optional(CONF_DEVICE_GROUP): self._get_device_group_selector()}
         )
 
         if user_input is not None:
@@ -2169,7 +2191,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_DEVICE_GROUP,
                         default=item.get(CONF_DEVICE_GROUP, ""),
-                    ): selector.TextSelector()
+                    ): self._get_device_group_selector()
                 }
             )
 
