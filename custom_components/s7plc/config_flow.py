@@ -60,6 +60,7 @@ from .const import (
     CONF_COVERS,
     CONF_CURRENT_TEMPERATURE_ADDRESS,
     CONF_DEVICE_CLASS,
+    CONF_DEVICE_NAME,
     CONF_ENABLE_METRICS,
     CONF_ENABLE_WRITE_BATCHING,
     CONF_ENTITY_SYNC,
@@ -2124,7 +2125,9 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
     async def _add_entity(self, step_id: str, user_input: dict[str, Any] | None = None):
         """Generic handler for *all* entity-add steps."""
         info = ENTITY_TYPE_REGISTRY[_ADD_STEP_TO_PREFIX[step_id]]
-        data_schema = info.build_add_schema(self)
+        data_schema = info.build_add_schema(self).extend(
+            {vol.Optional(CONF_DEVICE_NAME): selector.TextSelector()}
+        )
 
         if user_input is not None:
             builder = getattr(self, info.item_builder_name)
@@ -2136,6 +2139,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
                 )
 
             if item is not None:
+                self._copy_optional_fields(item, user_input, CONF_DEVICE_NAME)
                 self._options[info.option_key].append(item)
 
             if user_input.get("add_another"):
@@ -2160,10 +2164,22 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
         info = ENTITY_TYPE_REGISTRY[prefix]
 
         def _build(item: dict[str, Any]) -> vol.Schema:
-            return info.build_edit_schema(self, item)
+            return info.build_edit_schema(self, item).extend(
+                {
+                    vol.Optional(
+                        CONF_DEVICE_NAME,
+                        default=item.get(CONF_DEVICE_NAME, ""),
+                    ): selector.TextSelector()
+                }
+            )
 
         def _process(old_item: dict[str, Any], idx: int, inp: dict[str, Any]):
-            return getattr(self, info.item_builder_name)(inp, skip_idx=idx)
+            new_item, errors = getattr(self, info.item_builder_name)(
+                inp, skip_idx=idx
+            )
+            if new_item is not None:
+                self._copy_optional_fields(new_item, inp, CONF_DEVICE_NAME)
+            return new_item, errors
 
         return await self._edit_entity(
             option_key=info.option_key,
