@@ -36,7 +36,7 @@ from .const import (
     DEFAULT_PULSE_DURATION,
 )
 from .entity import S7BaseEntity
-from .helpers import default_entity_name, get_coordinator_and_device_info
+from .helpers import default_entity_name, get_coordinator_and_device_info, get_entity_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ async def async_setup_entry(
                     coord,
                     name,
                     unique_id,
-                    device_info,
+                    get_entity_device_info(device_info, device_id, item),
                     position_state,
                     position_command,
                     invert_position,
@@ -137,7 +137,7 @@ async def async_setup_entry(
                 coord,
                 name,
                 unique_id,
-                device_info,
+                get_entity_device_info(device_info, device_id, item),
                 open_command,
                 close_command,
                 opened_state,
