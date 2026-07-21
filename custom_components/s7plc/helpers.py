@@ -145,7 +145,7 @@ def get_coordinator_and_device_info(
 
     device_info = DeviceInfo(
         identifiers={(DOMAIN, device_id)},
-        name=device_name,
+        name=device_group,
         manufacturer="Siemens",
         model="S7 PLC",
     )
@@ -159,16 +159,16 @@ def get_entity_device_info(
     item: dict,
 ) -> DeviceInfo:
     """Return the root PLC device or a named child device for an entity."""
-    device_name = str(item.get("device_name", "")).strip()
-    if not device_name:
+    device_group = str(item.get("device_group", "")).strip()
+    if not device_group:
         return default_device_info
 
-    digest = sha256(device_name.casefold().encode("utf-8")).hexdigest()[:16]
+    digest = sha256(device_group.casefold().encode("utf-8")).hexdigest()[:16]
     return DeviceInfo(
         identifiers={(DOMAIN, f"{device_id}:device:{digest}")},
         name=device_name,
         manufacturer="Siemens",
-        model="S7 PLC device",
+        model="S7 PLC child device",
         via_device=(DOMAIN, device_id),
     )
 
