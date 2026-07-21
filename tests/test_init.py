@@ -27,6 +27,9 @@ def test_async_setup_creates_domain_storage():
     hass = HomeAssistant()
     assert asyncio.run(s7init.async_setup(hass, {})) is True
     assert const.DOMAIN in hass.data
+    assert len(hass.http.static_paths) == 1
+    assert len(hass.data["_test_ws_commands"]) == 3
+    assert len(hass.data["_test_panels"]) == 1
 
 
 def test_async_setup_entry_initialises_coordinator(monkeypatch):
@@ -155,4 +158,3 @@ def test_write_multi_service_registration(monkeypatch):
     registered_services = [s for (d, s) in service_calls]
     assert "health_check" in registered_services, f"health_check not in {registered_services}"
     assert "write_multi" in registered_services, f"write_multi not in {registered_services}"
-

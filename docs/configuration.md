@@ -90,6 +90,30 @@ Values outside these ranges are supported, but increasing them further may delay
 
 ## Managing Entities
 
+### Spreadsheet Entity Editor
+
+For PLCs with many tags, use **S7 PLC Editor** in the Home Assistant sidebar.
+The panel is available to administrators and edits one configured PLC at a time.
+
+The editor supports:
+
+- inline editing of entity type, device, name, addresses, unit, device class,
+  scan interval, and area;
+- additional type-specific settings in the **More** dialog;
+- copying selected rows to Excel or another spreadsheet as tab-separated data;
+- pasting a rectangular range of spreadsheet cells directly into the grid;
+- duplicating rows, deleting several rows, and filling the active column down;
+- filtering without changing the saved row order;
+- a single explicit **Save** operation with validation of every row.
+
+Nothing is written while you type. If any row is invalid, the entire save is
+rejected and the existing configuration remains unchanged. The editor also
+detects when the same PLC configuration was changed elsewhere while it was open
+and asks you to reload instead of overwriting newer data.
+
+The existing **Configure** forms remain available and can be used interchangeably
+with the spreadsheet editor.
+
 ### Adding Entities
 
 1. Open the integration and choose **Configure** → **Add items**.

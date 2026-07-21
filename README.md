@@ -44,6 +44,7 @@ Direct + lightweight custom component using `pys7`.
 - 🧮 **Value multipliers**: Scale raw PLC values before Home Assistant sees them
 - 🪶 **Lightweight**: Minimal overhead, no broker/services required
 - 🛠️ **Full UI configuration**: Set up and manage entirely from Home Assistant's UI
+- 📋 **Spreadsheet entity editor**: Edit many PLC entities at once, paste rows from Excel, fill values down, and save in one operation
 - 🔍 **Optional auto-discovery**: Pre-populates PLCs found on your local network
 - 📄 **S7 STRING support** for text sensors
 - 🔄 **State synchronization**: Bidirectional sync for switches and lights with physical controls
@@ -92,6 +93,10 @@ Direct + lightweight custom component using `pys7`.
    - or Local/Remote TSAP for TSAP mode (e.g. `10.00` / `10.01` for Logo! 0BA7)
 5. Configure timeout and retry settings for your network
 6. Add entities through **Configure** → **Add items**
+
+For larger configurations, administrators can also open **S7 PLC Editor** from
+the Home Assistant sidebar. It provides a spreadsheet-style view of all entities
+for one PLC and keeps changes as a draft until **Save** is pressed.
 
 ---
 

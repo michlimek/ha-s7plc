@@ -43,6 +43,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import S7Coordinator
+from .entity_editor import async_setup_entity_editor
 from .helpers import RuntimeEntryData, build_entity_area_map, build_expected_unique_ids
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ SERVICE_WRITE_MULTI = "write_multi"
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the integration."""
     hass.data.setdefault(DOMAIN, {})
+    await async_setup_entity_editor(hass)
     return True
 
 

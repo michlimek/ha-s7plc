@@ -52,6 +52,7 @@ class ConfigEntry:  # pragma: no cover - simple stub
         self.options = kwargs.get("options", {})
         self.entry_id = kwargs.get("entry_id", "test")
         self.title = kwargs.get("title", "Test Entry")
+        self.domain = kwargs.get("domain", None)
         self.runtime_data = None  # Will be set by async_setup_entry
 
     async def async_on_unload(self, func):
@@ -265,11 +266,15 @@ class HomeAssistant:  # pragma: no cover - simple stub
         async def async_reload(entry_id):
             return None
 
-        async def async_update_entry(entry, *, title=None, data=None, unique_id=None):
+        async def async_update_entry(
+            entry, *, title=None, data=None, options=None, unique_id=None
+        ):
             if title is not None:
                 entry.title = title
             if data is not None:
                 entry.data = data
+            if options is not None:
+                entry.options = options
             if unique_id is not None:
                 entry.unique_id = unique_id
             return None
@@ -314,6 +319,18 @@ class HomeAssistant:  # pragma: no cover - simple stub
         self.async_add_executor_job = async_add_executor_job
         self.async_create_task = async_create_task
         self.async_create_background_task = async_create_background_task
+
+        class MockHTTP:
+            def __init__(self):
+                self.static_paths = []
+
+            async def async_register_static_paths(self, paths):
+                self.static_paths.extend(paths)
+
+            def register_static_path(self, url_path, path, cache_headers):
+                self.static_paths.append((url_path, path, cache_headers))
+
+        self.http = MockHTTP()
 
 
 core.HomeAssistant = HomeAssistant
@@ -677,6 +694,79 @@ homeassistant.util = util
 components = ModuleType("homeassistant.components")
 sys.modules["homeassistant.components"] = components
 homeassistant.components = components
+
+# panel_custom component
+panel_custom = ModuleType("homeassistant.components.panel_custom")
+
+
+async def async_register_panel(hass, **kwargs):  # pragma: no cover - simple stub
+    hass.data.setdefault("_test_panels", []).append(kwargs)
+
+
+panel_custom.async_register_panel = async_register_panel
+sys.modules["homeassistant.components.panel_custom"] = panel_custom
+components.panel_custom = panel_custom
+
+# websocket_api component
+websocket_api = ModuleType("homeassistant.components.websocket_api")
+
+
+class ActiveConnection:  # pragma: no cover - simple stub
+    def __init__(self):
+        self.results = []
+        self.errors = []
+
+    def send_result(self, msg_id, result):
+        self.results.append((msg_id, result))
+
+    def send_error(self, msg_id, code, message):
+        self.errors.append((msg_id, code, message))
+
+
+def _ws_decorator(value):  # pragma: no cover - simple passthrough
+    if callable(value):
+        return value
+
+    def decorator(func):
+        return func
+
+    return decorator
+
+
+def websocket_command(schema):  # pragma: no cover - preserve schema for tests
+    def decorator(func):
+        func.ws_schema = schema
+        return func
+
+    return decorator
+
+
+def async_register_command(hass, command):
+    hass.data.setdefault("_test_ws_commands", []).append(command)
+
+
+websocket_api.ActiveConnection = ActiveConnection
+websocket_api.async_register_command = async_register_command
+websocket_api.async_response = _ws_decorator
+websocket_api.require_admin = _ws_decorator
+websocket_api.websocket_command = websocket_command
+sys.modules["homeassistant.components.websocket_api"] = websocket_api
+components.websocket_api = websocket_api
+
+# http component
+http = ModuleType("homeassistant.components.http")
+
+
+class StaticPathConfig:  # pragma: no cover - simple data holder
+    def __init__(self, url_path, path, cache_headers=True):
+        self.url_path = url_path
+        self.path = path
+        self.cache_headers = cache_headers
+
+
+http.StaticPathConfig = StaticPathConfig
+sys.modules["homeassistant.components.http"] = http
+components.http = http
 
 network = ModuleType("homeassistant.components.network")
 
@@ -1070,12 +1160,24 @@ def _range_factory(min=None, max=None):
 
     return _range
 
+
+def _length_factory(min=None, max=None):
+    def _length(value):  # pragma: no cover - simple stub
+        if min is not None and len(value) < min:
+            raise ValueError("value is too short")
+        if max is not None and len(value) > max:
+            raise ValueError("value is too long")
+        return value
+
+    return _length
+
 voluptuous.Schema = lambda schema: _Schema(schema)
 voluptuous.Required = _optional_factory(str)
 voluptuous.Optional = _optional_factory(str)
 voluptuous.All = _all_factory
 voluptuous.Coerce = _coerce_factory
 voluptuous.Range = _range_factory
+voluptuous.Length = _length_factory
 sys.modules["voluptuous"] = voluptuous
 
 
