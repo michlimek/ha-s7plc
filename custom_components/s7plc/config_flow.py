@@ -60,7 +60,7 @@ from .const import (
     CONF_COVERS,
     CONF_CURRENT_TEMPERATURE_ADDRESS,
     CONF_DEVICE_CLASS,
-    CONF_DEVICE_NAME,
+    CONF_DEVICE_GROUP,
     CONF_ENABLE_METRICS,
     CONF_ENABLE_WRITE_BATCHING,
     CONF_ENTITY_SYNC,
@@ -2126,7 +2126,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
         """Generic handler for *all* entity-add steps."""
         info = ENTITY_TYPE_REGISTRY[_ADD_STEP_TO_PREFIX[step_id]]
         data_schema = info.build_add_schema(self).extend(
-            {vol.Optional(CONF_DEVICE_NAME): selector.TextSelector()}
+            {vol.Optional(CONF_DEVICE_GROUP): selector.TextSelector()}
         )
 
         if user_input is not None:
@@ -2139,7 +2139,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
                 )
 
             if item is not None:
-                self._copy_optional_fields(item, user_input, CONF_DEVICE_NAME)
+                self._copy_optional_fields(item, user_input, CONF_DEVICE_GROUP)
                 self._options[info.option_key].append(item)
 
             if user_input.get("add_another"):
@@ -2167,8 +2167,8 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
             return info.build_edit_schema(self, item).extend(
                 {
                     vol.Optional(
-                        CONF_DEVICE_NAME,
-                        default=item.get(CONF_DEVICE_NAME, ""),
+                        CONF_DEVICE_GROUP,
+                        default=item.get(CONF_DEVICE_GROUP, ""),
                     ): selector.TextSelector()
                 }
             )
@@ -2178,7 +2178,7 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
                 inp, skip_idx=idx
             )
             if new_item is not None:
-                self._copy_optional_fields(new_item, inp, CONF_DEVICE_NAME)
+                self._copy_optional_fields(new_item, inp, CONF_DEVICE_GROUP)
             return new_item, errors
 
         return await self._edit_entity(
