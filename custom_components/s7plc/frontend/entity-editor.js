@@ -198,6 +198,18 @@ const UI = {
     plc: "Sterownik",
     search: "Szukaj po nazwie, adresie lub urządzeniu…",
     add: "Dodaj wiersz",
+    addDevice: "Dodaj urządzenie",
+    newDevice: "Nowe urządzenie",
+    deviceName: "Nazwa urządzenia",
+    deviceNamePlaceholder: "np. Suszarka 1",
+    create: "Utwórz",
+    cancel: "Anuluj",
+    rootDevice: "Sterownik PLC",
+    createDeviceForRow: "Nowe urządzenie zostanie przypisane do tego wiersza.",
+    createDeviceForSelection: "Nowe urządzenie zostanie przypisane do zaznaczonych encji.",
+    createDeviceWithRow: "Zostanie dodany nowy wiersz przypisany do tego urządzenia.",
+    deviceCreated: "Urządzenie zostało dodane do konfiguracji.",
+    deviceNameRequired: "Podaj nazwę urządzenia.",
     save: "Zapisz",
     discard: "Odrzuć zmiany",
     unsaved: "Niezapisane zmiany",
@@ -239,6 +251,7 @@ const UI = {
     confirmSwitch: "Masz niezapisane zmiany. Odrzucić je i przełączyć sterownik?",
     confirmDiscard: "Odrzucić wszystkie niezapisane zmiany?",
     excelTip: "Wklejaj wiele komórek bezpośrednio do tabeli (Ctrl+V). Kolejność kolumn jest taka jak na ekranie.",
+    sort: "Sortuj",
   },
   en: {
     title: "S7 PLC entity editor",
@@ -246,6 +259,18 @@ const UI = {
     plc: "PLC",
     search: "Search by name, address or device…",
     add: "Add row",
+    addDevice: "Add device",
+    newDevice: "New device",
+    deviceName: "Device name",
+    deviceNamePlaceholder: "e.g. Dryer 1",
+    create: "Create",
+    cancel: "Cancel",
+    rootDevice: "PLC controller",
+    createDeviceForRow: "The new device will be assigned to this row.",
+    createDeviceForSelection: "The new device will be assigned to the selected entities.",
+    createDeviceWithRow: "A new row assigned to this device will be added.",
+    deviceCreated: "The device was added to the configuration.",
+    deviceNameRequired: "Enter a device name.",
     save: "Save",
     discard: "Discard changes",
     unsaved: "Unsaved changes",
@@ -287,6 +312,7 @@ const UI = {
     confirmSwitch: "You have unsaved changes. Discard them and switch PLC?",
     confirmDiscard: "Discard all unsaved changes?",
     excelTip: "Paste multiple cells directly into the grid (Ctrl+V). Columns follow the on-screen order.",
+    sort: "Sort",
   },
 };
 
@@ -336,8 +362,11 @@ class S7PLCEntityEditor extends HTMLElement {
     this._selected = new Set();
     this._dirty = false;
     this._query = "";
+    this._sortKey = null;
+    this._sortDirection = 1;
     this._addType = "s";
     this._dialogIndex = null;
+    this._deviceDialog = null;
     this._serverErrors = new Map();
     this._activeField = "primary";
     this._toast = null;
@@ -435,6 +464,7 @@ class S7PLCEntityEditor extends HTMLElement {
       this._serverErrors.clear();
       this._dirty = false;
       this._dialogIndex = null;
+      this._deviceDialog = null;
     } catch (error) {
       this._showToast(this._t.loadFailed, "error");
     } finally {
@@ -453,7 +483,7 @@ class S7PLCEntityEditor extends HTMLElement {
 
   _visibleRows() {
     const needle = this._query.trim().toLocaleLowerCase();
-    return this._rows
+    const rows = this._rows
       .map((row, index) => ({ row, index }))
       .filter(({ row }) => {
         if (!needle) return true;
@@ -465,6 +495,97 @@ class S7PLCEntityEditor extends HTMLElement {
           .toLocaleLowerCase();
         return haystack.includes(needle);
       });
+
+    if (!this._sortKey) return rows;
+
+    const collator = new Intl.Collator(this._lang, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    return rows.sort((left, right) => {
+      const leftValue = this._sortValue(left, this._sortKey);
+      const rightValue = this._sortValue(right, this._sortKey);
+      let comparison;
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        comparison = leftValue - rightValue;
+      } else {
+        comparison = collator.compare(String(leftValue ?? ""), String(rightValue ?? ""));
+      }
+      return comparison === 0
+        ? left.index - right.index
+        : comparison * this._sortDirection;
+    });
+  }
+
+  _sortValue(item, key) {
+    const { row, index } = item;
+    if (key === "index") return index;
+    if (key === "prefix") return this._label(this._definition(row).label);
+    if (key === "primary" || key === "secondary") {
+      return this._logicalValue(row, key);
+    }
+    if (key === "area") {
+      const area = this._areas.find((candidate) => candidate.value === row.data.area);
+      return area?.label ?? row.data.area ?? "";
+    }
+    if (key === "scan_interval") {
+      if (row.data.scan_interval === undefined || row.data.scan_interval === "") {
+        return Number.POSITIVE_INFINITY;
+      }
+      const value = Number(row.data.scan_interval);
+      return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+    }
+    return row.data[key] ?? "";
+  }
+
+  _toggleSort(key) {
+    if (this._sortKey !== key) {
+      this._sortKey = key;
+      this._sortDirection = 1;
+    } else if (this._sortDirection === 1) {
+      this._sortDirection = -1;
+    } else {
+      this._sortKey = null;
+      this._sortDirection = 1;
+    }
+    this._render();
+  }
+
+  _sortHeader(key, label) {
+    const active = this._sortKey === key;
+    const indicator = active ? (this._sortDirection === 1 ? "▲" : "▼") : "↕";
+    const ariaSort = !active
+      ? "none"
+      : this._sortDirection === 1
+        ? "ascending"
+        : "descending";
+    return `<th aria-sort="${ariaSort}"><button class="sort-button ${active ? "active" : ""}" data-action="sort" data-sort-key="${escapeHtml(key)}" title="${escapeHtml(this._t.sort)}">${escapeHtml(label)} <span>${indicator}</span></button></th>`;
+  }
+
+  _refreshGrid() {
+    const tbody = this.shadowRoot.querySelector("tbody");
+    if (!tbody) return;
+    const visible = this._visibleRows();
+    tbody.innerHTML =
+      visible.map(({ row, index }) => this._renderRow(row, index)).join("") ||
+      `<tr><td colspan="13"><div class="empty-state">${escapeHtml(this._t.noRows)}</div></td></tr>`;
+    const selectAll = this.shadowRoot.querySelector('[data-action="select-all"]');
+    if (selectAll) {
+      selectAll.checked =
+        visible.length > 0 &&
+        visible.every(({ index }) => this._selected.has(index));
+    }
+  }
+
+  _selectedIndicesInViewOrder() {
+    const visible = this._visibleRows()
+      .map(({ index }) => index)
+      .filter((index) => this._selected.has(index));
+    const visibleSet = new Set(visible);
+    const hidden = [...this._selected]
+      .filter((index) => !visibleSet.has(index))
+      .sort((left, right) => left - right);
+    return [...visible, ...hidden];
   }
 
   _markDirty() {
@@ -651,7 +772,7 @@ class S7PLCEntityEditor extends HTMLElement {
   }
 
   async _copySelected() {
-    const indices = [...this._selected].sort((a, b) => a - b);
+    const indices = this._selectedIndicesInViewOrder();
     if (!indices.length) return;
     const columns = [
       "prefix",
@@ -682,7 +803,7 @@ class S7PLCEntityEditor extends HTMLElement {
   }
 
   _fillDown() {
-    const indices = [...this._selected].sort((a, b) => a - b);
+    const indices = this._selectedIndicesInViewOrder();
     if (indices.length < 2) {
       this._showToast(this._t.fillHint, "warning");
       return;
@@ -789,6 +910,33 @@ class S7PLCEntityEditor extends HTMLElement {
     ].join("");
   }
 
+  _deviceGroups() {
+    const groups = new Map();
+    [...this._groups, ...this._rows.map((row) => row.data.device_group)]
+      .map((group) => String(group ?? "").trim())
+      .filter(Boolean)
+      .forEach((group) => {
+        if (!groups.has(group.toLocaleLowerCase())) {
+          groups.set(group.toLocaleLowerCase(), group);
+        }
+      });
+    return [...groups.values()].sort((left, right) =>
+      left.localeCompare(right, this._lang, { sensitivity: "base" }),
+    );
+  }
+
+  _deviceOptions(selected) {
+    const groups = this._deviceGroups();
+    return [
+      `<option value="">${escapeHtml(this._t.rootDevice)}</option>`,
+      ...groups.map(
+        (group) =>
+          `<option value="${escapeHtml(group)}" ${group.toLocaleLowerCase() === String(selected).toLocaleLowerCase() ? "selected" : ""}>${escapeHtml(group)}</option>`,
+      ),
+      `<option value="__s7plc_add_device__">＋ ${escapeHtml(this._t.addDevice)}…</option>`,
+    ].join("");
+  }
+
   _input(index, key, value, logical, options = {}) {
     const classes = ["cell-input"];
     if (options.invalid) classes.push("invalid");
@@ -824,7 +972,7 @@ class S7PLCEntityEditor extends HTMLElement {
           <select class="cell-input" data-action="row-type" data-index="${index}" data-copy-field="prefix">${this._typeOptions(row.prefix)}</select>
           ${error ? `<span class="row-error-text">${escapeHtml(this._errorText(error))}</span>` : ""}
         </td>
-        <td>${this._input(index, "device_group", data.device_group ?? "", "device_group", { list: "device-group-list" })}</td>
+        <td><select class="cell-input" data-action="device-group" data-index="${index}" data-key="device_group" data-copy-field="device_group">${this._deviceOptions(data.device_group ?? "")}</select></td>
         <td>${this._input(index, "name", data.name ?? "", "name")}</td>
         <td>${this._input(index, definition.primary.key, primaryValue, "primary", {
           invalid: this._requiredMissing(row, "primary"),
@@ -893,6 +1041,81 @@ class S7PLCEntityEditor extends HTMLElement {
       </div>`;
   }
 
+  _renderDeviceDialog() {
+    if (!this._deviceDialog) return "";
+    const hint = Number.isInteger(this._deviceDialog.rowIndex)
+      ? this._t.createDeviceForRow
+      : this._selected.size
+        ? this._t.createDeviceForSelection
+        : this._t.createDeviceWithRow;
+    return `
+      <div class="dialog-backdrop" data-action="close-device-backdrop">
+        <section class="dialog device-dialog" role="dialog" aria-modal="true">
+          <header>
+            <div>
+              <h2>${escapeHtml(this._t.newDevice)}</h2>
+              <p>${escapeHtml(hint)}</p>
+            </div>
+            <button class="icon-button" data-action="cancel-device">×</button>
+          </header>
+          <div class="advanced-grid">
+            <label>
+              <span>${escapeHtml(this._t.deviceName)}</span>
+              <input data-action="device-name" type="text" autocomplete="off" placeholder="${escapeHtml(this._t.deviceNamePlaceholder)}">
+            </label>
+          </div>
+          <footer>
+            <button class="secondary" data-action="cancel-device">${escapeHtml(this._t.cancel)}</button>
+            <button class="primary" data-action="create-device">${escapeHtml(this._t.create)}</button>
+          </footer>
+        </section>
+      </div>`;
+  }
+
+  _openDeviceDialog(rowIndex = null) {
+    this._deviceDialog = { rowIndex };
+    this._render();
+    const input = this.shadowRoot.querySelector('[data-action="device-name"]');
+    input?.focus();
+  }
+
+  _createDevice() {
+    const input = this.shadowRoot.querySelector('[data-action="device-name"]');
+    const requestedName = String(input?.value ?? "").trim();
+    if (!requestedName) {
+      input?.classList.add("invalid");
+      input?.setAttribute("title", this._t.deviceNameRequired);
+      input?.focus();
+      return;
+    }
+
+    const group =
+      this._deviceGroups().find(
+        (existing) => existing.toLocaleLowerCase() === requestedName.toLocaleLowerCase(),
+      ) ?? requestedName;
+    let targets;
+    if (Number.isInteger(this._deviceDialog?.rowIndex)) {
+      targets = [this._deviceDialog.rowIndex];
+    } else if (this._selected.size) {
+      targets = [...this._selected];
+    } else {
+      this._rows.push(this._newRow());
+      targets = [this._rows.length - 1];
+      this._query = "";
+    }
+
+    targets.forEach((index) => {
+      if (this._rows[index]) this._rows[index].data.device_group = group;
+    });
+    if (!this._groups.some((existing) => existing.toLocaleLowerCase() === group.toLocaleLowerCase())) {
+      this._groups.push(group);
+    }
+    this._deviceDialog = null;
+    this._markDirty();
+    this._render();
+    this._showToast(this._t.deviceCreated, "success");
+  }
+
   _styles() {
     return `
       :host { display: block; min-height: 100vh; color: var(--primary-text-color); background: var(--primary-background-color); font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif); }
@@ -908,7 +1131,7 @@ class S7PLCEntityEditor extends HTMLElement {
       .dirty-indicator { font-size: 13px; color: var(--secondary-text-color); white-space: nowrap; }
       .dirty-indicator.is-dirty { color: var(--warning-color, #f59e0b); font-weight: 600; }
       .card { background: var(--card-background-color); border-radius: var(--ha-card-border-radius, 12px); box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0,0,0,.15)); overflow: hidden; }
-      .toolbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(240px, 1.6fr) auto auto; gap: 10px; padding: 14px; border-bottom: 1px solid var(--divider-color); align-items: end; }
+      .toolbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(240px, 1.6fr) auto; gap: 10px; padding: 14px; border-bottom: 1px solid var(--divider-color); align-items: end; }
       .toolbar-group { display: flex; gap: 8px; align-items: end; }
       .toolbar label { display: grid; gap: 5px; font-size: 12px; color: var(--secondary-text-color); }
       .toolbar input, .toolbar select, .advanced-grid input, .advanced-grid select { height: 40px; border: 1px solid var(--divider-color); background: var(--card-background-color); border-radius: 7px; padding: 0 10px; min-width: 0; }
@@ -923,6 +1146,10 @@ class S7PLCEntityEditor extends HTMLElement {
       .table-wrap { overflow: auto; max-height: calc(100vh - 275px); min-height: 260px; }
       table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
       th { position: sticky; top: 0; z-index: 2; text-align: left; font-size: 12px; color: var(--secondary-text-color); font-weight: 600; background: var(--card-background-color); border-bottom: 1px solid var(--divider-color); padding: 9px 7px; white-space: nowrap; }
+      .sort-button { display: inline-flex; align-items: center; gap: 5px; width: 100%; padding: 0; border: 0; color: inherit; background: transparent; font-weight: inherit; text-align: left; white-space: nowrap; }
+      .sort-button span { color: var(--disabled-text-color); font-size: 10px; }
+      .sort-button.active { color: var(--primary-color); }
+      .sort-button.active span { color: var(--primary-color); }
       td { padding: 5px 4px; border-bottom: 1px solid var(--divider-color); background: var(--card-background-color); vertical-align: top; }
       tbody tr:hover td { background: color-mix(in srgb, var(--primary-color) 4%, var(--card-background-color)); }
       tr.row-error td { background: color-mix(in srgb, var(--error-color) 7%, var(--card-background-color)); }
@@ -956,6 +1183,10 @@ class S7PLCEntityEditor extends HTMLElement {
       .advanced-checkbox { min-height: 42px; display: flex; align-items: center; gap: 9px; }
       .advanced-checkbox input { width: 18px; height: 18px; }
       .dialog footer { display: flex; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--divider-color); }
+      .device-dialog { width: min(520px, 100%); }
+      .device-dialog .advanced-grid { grid-template-columns: 1fr; }
+      .device-dialog footer { gap: 10px; }
+      .device-dialog input.invalid { border-color: var(--error-color); box-shadow: 0 0 0 1px var(--error-color); }
       .empty-dialog { grid-column: 1 / -1; color: var(--secondary-text-color); text-align: center; }
       .toast { position: fixed; right: 20px; bottom: 20px; z-index: 30; max-width: 520px; padding: 13px 16px; color: white; background: #374151; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
       .toast.success { background: #18794e; }
@@ -1011,6 +1242,7 @@ class S7PLCEntityEditor extends HTMLElement {
             <div class="toolbar-group">
               <select data-action="add-type">${this._typeOptions(this._addType)}</select>
               <button class="primary" data-action="add" ${!this._entryId ? "disabled" : ""}>+ ${escapeHtml(this._t.add)}</button>
+              <button class="secondary" data-action="add-device" ${!this._entryId ? "disabled" : ""}>+ ${escapeHtml(this._t.addDevice)}</button>
             </div>
           </div>
 
@@ -1031,9 +1263,16 @@ class S7PLCEntityEditor extends HTMLElement {
                   <table>
                     <thead><tr>
                       <th class="check"><input type="checkbox" data-action="select-all" ${allVisibleSelected ? "checked" : ""}></th>
-                      <th>#</th><th>${escapeHtml(this._t.type)}</th><th>${escapeHtml(this._t.device)}</th><th>${escapeHtml(this._t.name)}</th>
-                      <th>${escapeHtml(this._t.address1)}</th><th>${escapeHtml(this._t.address2)}</th><th>${escapeHtml(this._t.unit)}</th>
-                      <th>${escapeHtml(this._t.deviceClass)}</th><th>${escapeHtml(this._t.interval)}</th><th>${escapeHtml(this._t.area)}</th>
+                      ${this._sortHeader("index", "#")}
+                      ${this._sortHeader("prefix", this._t.type)}
+                      ${this._sortHeader("device_group", this._t.device)}
+                      ${this._sortHeader("name", this._t.name)}
+                      ${this._sortHeader("primary", this._t.address1)}
+                      ${this._sortHeader("secondary", this._t.address2)}
+                      ${this._sortHeader("unit_of_measurement", this._t.unit)}
+                      ${this._sortHeader("device_class", this._t.deviceClass)}
+                      ${this._sortHeader("scan_interval", this._t.interval)}
+                      ${this._sortHeader("area", this._t.area)}
                       <th>${escapeHtml(this._t.more)}</th><th>${escapeHtml(this._t.actions)}</th>
                     </tr></thead>
                     <tbody>${rows || `<tr><td colspan="13"><div class="empty-state">${escapeHtml(this._t.noRows)}</div></td></tr>`}</tbody>
@@ -1042,9 +1281,9 @@ class S7PLCEntityEditor extends HTMLElement {
         </section>
       </main>
 
-      <datalist id="device-group-list">${this._groups.map((group) => `<option value="${escapeHtml(group)}"></option>`).join("")}</datalist>
       <datalist id="entity-id-list">${Object.keys(this._hass?.states ?? {}).map((entityId) => `<option value="${escapeHtml(entityId)}"></option>`).join("")}</datalist>
       ${this._renderDialog()}
+      ${this._renderDeviceDialog()}
       ${this._toast ? `<div class="toast ${escapeHtml(this._toast.kind)}">${escapeHtml(this._toast.message)}</div>` : ""}
     `;
     this._bindEvents();
@@ -1058,8 +1297,7 @@ class S7PLCEntityEditor extends HTMLElement {
       const target = event.target;
       if (target.dataset.action === "search") {
         this._query = target.value;
-        this._render();
-        this.shadowRoot.querySelector('[data-action="search"]')?.focus();
+        this._refreshGrid();
         return;
       }
       if (target.dataset.key) this._writeElementValue(target);
@@ -1077,6 +1315,12 @@ class S7PLCEntityEditor extends HTMLElement {
         this._addType = target.value;
       } else if (action === "row-type") {
         this._switchRowType(Number(target.dataset.index), target.value);
+      } else if (action === "device-group") {
+        if (target.value === "__s7plc_add_device__") {
+          this._openDeviceDialog(Number(target.dataset.index));
+        } else {
+          this._writeElementValue(target);
+        }
       } else if (action === "select-row") {
         const index = Number(target.dataset.index);
         if (target.checked) this._selected.add(index);
@@ -1095,6 +1339,16 @@ class S7PLCEntityEditor extends HTMLElement {
     root.addEventListener("focusin", (event) => {
       if (event.target.dataset.copyField) this._activeField = event.target.dataset.copyField;
     });
+    root.addEventListener("keydown", (event) => {
+      if (!this._deviceDialog) return;
+      if (event.key === "Enter" && event.target.dataset.action === "device-name") {
+        event.preventDefault();
+        this._createDevice();
+      } else if (event.key === "Escape") {
+        this._deviceDialog = null;
+        this._render();
+      }
+    });
     root.addEventListener("paste", (event) => this._pasteGrid(event));
     root.addEventListener("click", async (event) => {
       const target = event.target.closest("[data-action]");
@@ -1106,6 +1360,18 @@ class S7PLCEntityEditor extends HTMLElement {
         this._markDirty();
         this._render();
         this.shadowRoot.querySelector(`[data-index="${this._rows.length - 1}"][data-copy-field="primary"]`)?.focus();
+      } else if (action === "add-device") {
+        this._openDeviceDialog();
+      } else if (action === "create-device") {
+        this._createDevice();
+      } else if (action === "cancel-device") {
+        this._deviceDialog = null;
+        this._render();
+      } else if (action === "close-device-backdrop" && event.target === target) {
+        this._deviceDialog = null;
+        this._render();
+      } else if (action === "sort") {
+        this._toggleSort(target.dataset.sortKey);
       } else if (action === "duplicate") {
         const copy = JSON.parse(JSON.stringify(this._rows[index]));
         this._rows.splice(index + 1, 0, copy);

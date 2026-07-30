@@ -42,7 +42,7 @@ from .const import (
 PANEL_URL_PATH = "s7plc-editor"
 PANEL_COMPONENT_NAME = "s7plc-entity-editor"
 PANEL_STATIC_URL = "/s7plc_static/entity-editor.js"
-PANEL_ASSET_VERSION = "1"
+PANEL_ASSET_VERSION = "2"
 
 WS_LIST = "s7plc/entity_editor/list"
 WS_GET = "s7plc/entity_editor/get"
