@@ -13,6 +13,8 @@ from .address import get_numeric_limits, parse_tag
 from .const import (
     CONF_ADDRESS,
     CONF_AREA,
+    CONF_AVAILABILITY_ADDRESS,
+    CONF_AVAILABILITY_INVERT,
     CONF_COMMAND_ADDRESS,
     CONF_DEVICE_CLASS,
     CONF_MAX_VALUE,
@@ -67,8 +69,18 @@ async def async_setup_entry(
         value_multiplier = item.get(CONF_VALUE_MULTIPLIER)
         scale_raw_min = item.get(CONF_SCALE_RAW_MIN)
         scale_raw_max = item.get(CONF_SCALE_RAW_MAX)
+        availability_address = item.get(CONF_AVAILABILITY_ADDRESS)
+        availability_invert = item.get(CONF_AVAILABILITY_INVERT, False)
 
         scan_interval = item.get(CONF_SCAN_INTERVAL)
+        availability_topic = None
+        if availability_address:
+            availability_topic = f"availability:{availability_address.upper()}"
+            await coord.add_item(
+                availability_topic,
+                availability_address,
+                scan_interval,
+            )
         await coord.add_item(topic, address, scan_interval, real_precision)
         entities.append(
             S7Number(
@@ -88,6 +100,9 @@ async def async_setup_entry(
                 value_multiplier=value_multiplier,
                 scale_raw_min=scale_raw_min,
                 scale_raw_max=scale_raw_max,
+                availability_topic=availability_topic,
+                availability_address=availability_address,
+                availability_invert=availability_invert,
             )
         )
 
@@ -119,6 +134,9 @@ class S7Number(S7BaseEntity, NumberEntity):
         value_multiplier: float | None = None,
         scale_raw_min: float | None = None,
         scale_raw_max: float | None = None,
+        availability_topic: str | None = None,
+        availability_address: str | None = None,
+        availability_invert: bool = False,
     ):
         super().__init__(
             coordinator,
@@ -128,6 +146,9 @@ class S7Number(S7BaseEntity, NumberEntity):
             topic=topic,
             address=address,
             suggested_area_id=suggested_area_id,
+            availability_topic=availability_topic,
+            availability_address=availability_address,
+            availability_invert=availability_invert,
         )
         self._command_address = command_address
 

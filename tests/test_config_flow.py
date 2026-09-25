@@ -317,6 +317,29 @@ def test_options_connection_updates_entry(monkeypatch):
     )
 
 
+def test_number_accepts_availability_address():
+    flow = make_options_flow(options={const.CONF_NUMBERS: []})
+    flow.hass = HomeAssistant()
+
+    result = run_flow(
+        flow.async_step_numbers(
+            {
+                const.CONF_ADDRESS: "DB13,R208",
+                const.CONF_COMMAND_ADDRESS: "DB13,R208",
+                const.CONF_MIN_VALUE: 1,
+                const.CONF_MAX_VALUE: 500,
+                const.CONF_AVAILABILITY_ADDRESS: "DB30,X234.5",
+                const.CONF_AVAILABILITY_INVERT: False,
+            }
+        )
+    )
+
+    assert result["type"] == "create_entry"
+    stored = flow._options[const.CONF_NUMBERS][0]
+    assert stored[const.CONF_AVAILABILITY_ADDRESS] == "DB30,X234.5"
+    assert stored[const.CONF_AVAILABILITY_INVERT] is False
+
+
 def test_number_limits_clamped_on_add():
     flow = make_options_flow(options={const.CONF_NUMBERS: []})
     flow.hass = HomeAssistant()

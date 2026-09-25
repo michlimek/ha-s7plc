@@ -12,17 +12,21 @@ from custom_components.s7plc.const import (
     CONF_CLIMATES,
     CONF_COVERS,
     CONF_DEVICE_GROUP,
+    CONF_NUMBERS,
     CONF_POSITION_STATE_ADDRESS,
     CONF_SENSORS,
     CONTROL_MODE_DIRECT,
     DOMAIN,
 )
 from custom_components.s7plc.entity_editor import (
+    WS_IMPORT,
     WS_SAVE,
     async_setup_entity_editor,
     entity_options_revision,
+    merge_import_payload,
     options_to_editor_rows,
     validate_editor_rows,
+    websocket_import_editor,
     websocket_save_editor,
 )
 
@@ -101,6 +105,117 @@ def test_validate_editor_rows_reports_duplicate_addresses():
     assert errors == [{"row": 1, "field": "base", "code": "duplicate_entry"}]
 
 
+def test_merge_import_payload_adds_without_replacing_existing_entities():
+    entry = _entry(
+        {
+            CONF_SENSORS: [{CONF_ADDRESS: "DB1,W0", "name": "Existing"}],
+        }
+    )
+
+    rows, errors, stats = merge_import_payload(
+        entry,
+        {
+            CONF_NUMBERS: [
+                {
+                    CONF_ADDRESS: "DB13,R208",
+                    "command_address": "DB13,R208",
+                    "name": "Pressure setpoint",
+                    "device_group": "Wentylacja suszarki",
+                    "availability_address": "DB30,X234.5",
+                }
+            ]
+        },
+    )
+
+    assert errors == []
+    assert stats == {"added": 1, "skipped": 0}
+    assert rows is not None
+    assert any(
+        row["prefix"] == "s" and row["data"][CONF_ADDRESS] == "DB1,W0"
+        for row in rows
+    )
+    imported = next(row for row in rows if row["prefix"] == "nm")
+    assert imported["data"][CONF_ADDRESS] == "DB13,R208"
+    assert imported["data"]["device_group"] == "Wentylacja suszarki"
+    assert imported["data"]["availability_address"] == "DB30,X234.5"
+
+
+def test_merge_import_payload_skips_existing_duplicate_without_changing_it():
+    entry = _entry(
+        {
+            CONF_NUMBERS: [
+                {
+                    CONF_ADDRESS: "DB13,R208",
+                    "command_address": "DB13,R208",
+                    "name": "Existing name",
+                }
+            ]
+        }
+    )
+
+    rows, errors, stats = merge_import_payload(
+        entry,
+        {
+            CONF_NUMBERS: [
+                {
+                    CONF_ADDRESS: "db13,r208",
+                    "command_address": "DB13,R208",
+                    "name": "Imported replacement",
+                },
+                {
+                    CONF_ADDRESS: "DB13,R212",
+                    "command_address": "DB13,R212",
+                    "name": "New item",
+                },
+            ]
+        },
+    )
+
+    assert errors == []
+    assert stats == {"added": 1, "skipped": 1}
+    assert rows is not None
+    number_rows = [row for row in rows if row["prefix"] == "nm"]
+    assert [row["data"][CONF_ADDRESS] for row in number_rows] == [
+        "DB13,R208",
+        "DB13,R212",
+    ]
+    assert number_rows[0]["data"]["name"] == "Existing name"
+
+
+def test_websocket_import_prepares_rows_without_mutating_entry():
+    entry = _entry({CONF_SENSORS: [{CONF_ADDRESS: "DB1,W0"}]})
+    hass = HomeAssistant()
+    hass.config_entries._entries.append(entry)
+    connection = ActiveConnection()
+    revision = entity_options_revision(entry.options)
+
+    websocket_import_editor(
+        hass,
+        connection,
+        {
+            "id": 6,
+            "type": WS_IMPORT,
+            "entry_id": entry.entry_id,
+            "revision": revision,
+            "payload": {
+                CONF_NUMBERS: [
+                    {
+                        CONF_ADDRESS: "DB13,R208",
+                        "command_address": "DB13,R208",
+                    }
+                ]
+            },
+        },
+    )
+
+    result = connection.results[0][1]
+    assert result["imported"] is True
+    assert result["added"] == 1
+    assert result["skipped"] == 0
+    assert entry.options == {CONF_SENSORS: [{CONF_ADDRESS: "DB1,W0"}]}
+    assert any(row["prefix"] == "nm" for row in result["rows"])
+
+
 def test_websocket_save_rejects_stale_revision():
     entry = _entry({CONF_SENSORS: [{CONF_ADDRESS: "DB1,W0"}]})
     hass = HomeAssistant()
@@ -166,5 +281,5 @@ def test_editor_setup_registers_panel_static_asset_and_commands_once():
     asyncio.run(async_setup_entity_editor(hass))
 
     assert len(hass.http.static_paths) == 1
-    assert len(hass.data["_test_ws_commands"]) == 3
+    assert len(hass.data["_test_ws_commands"]) == 4
     assert len(hass.data["_test_panels"]) == 1
