@@ -441,7 +441,7 @@ def _add_schema_number(flow) -> vol.Schema:
             vol.Optional(CONF_REAL_PRECISION): real_precision_selector,
             vol.Optional(CONF_SCAN_INTERVAL): scan_interval_selector,
             vol.Optional(CONF_AVAILABILITY_ADDRESS): selector.TextSelector(),
-            vol.Optional(CONF_AVAILABILITY_INVERT, default=False): selector.BooleanSelector(),
+            vol.Optional(\n                CONF_AVAILABILITY_INVERT, default=False\n            ): selector.BooleanSelector(),
             vol.Optional(CONF_AREA): flow._get_area_selector(),
             vol.Optional("add_another", default=False): selector.BooleanSelector(),
         }
