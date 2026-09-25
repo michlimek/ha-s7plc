@@ -1,5 +1,6 @@
 const WS_LIST = "s7plc/entity_editor/list";
 const WS_GET = "s7plc/entity_editor/get";
+const WS_IMPORT = "s7plc/entity_editor/import";
 const WS_SAVE = "s7plc/entity_editor/save";
 
 const COMMON_FIELDS = [
@@ -198,6 +199,10 @@ const UI = {
     plc: "Sterownik",
     search: "Szukaj po nazwie, adresie lub urządzeniu…",
     add: "Dodaj wiersz",
+    importJson: "Importuj JSON",
+    importSummary: "Import: dodano {added}, pominięto istniejące {skipped}. Zapisz, aby zastosować zmiany.",
+    importNoNew: "Import nie zawiera nowych encji. Pominięto istniejące: {skipped}.",
+    importFailed: "Nie udało się zaimportować pliku JSON.",
     addDevice: "Dodaj urządzenie",
     newDevice: "Nowe urządzenie",
     deviceName: "Nazwa urządzenia",
@@ -259,6 +264,10 @@ const UI = {
     plc: "PLC",
     search: "Search by name, address or device…",
     add: "Add row",
+    importJson: "Import JSON",
+    importSummary: "Import: added {added}, skipped existing {skipped}. Press Save to apply the changes.",
+    importNoNew: "The import contains no new entities. Existing skipped: {skipped}.",
+    importFailed: "Could not import the JSON file.",
     addDevice: "Add device",
     newDevice: "New device",
     deviceName: "Device name",
@@ -771,6 +780,59 @@ class S7PLCEntityEditor extends HTMLElement {
     this._showToast(this._t.pasted, "success");
   }
 
+  async _importFile(file) {
+    if (!file || !this._entryId) return;
+
+    try {
+      const payload = JSON.parse(await file.text());
+      const result = await this._callWS({
+        type: WS_IMPORT,
+        entry_id: this._entryId,
+        revision: this._revision,
+        payload,
+      });
+
+      if (!result.imported) {
+        const firstError = result.errors?.[0]?.code;
+        const message = firstError
+          ? this._t.importFailed + " (" + this._errorText(firstError) + ")"
+          : this._t.importFailed;
+        this._showToast(message, "error");
+        return;
+      }
+
+      const added = Number(result.added ?? 0);
+      const skipped = Number(result.skipped ?? 0);
+
+      if (added > 0) {
+        this._rows = (result.rows ?? []).map((row) => ({
+          prefix: row.prefix,
+          data: { ...row.data },
+        }));
+        this._selected.clear();
+        this._serverErrors.clear();
+        this._markDirty();
+        this._render();
+        this._showToast(
+          this._t.importSummary
+            .replace("{added}", String(added))
+            .replace("{skipped}", String(skipped)),
+          "success",
+        );
+        return;
+      }
+
+      this._showToast(
+        this._t.importNoNew.replace("{skipped}", String(skipped)),
+        "warning",
+      );
+    } catch (error) {
+      this._showToast(
+        error?.code === "stale_config" ? this._t.stale : this._t.importFailed,
+        "error",
+      );
+    }
+  }
   async _copySelected() {
     const indices = this._selectedIndicesInViewOrder();
     if (!indices.length) return;
@@ -1242,6 +1304,7 @@ class S7PLCEntityEditor extends HTMLElement {
             <div class="toolbar-group">
               <select data-action="add-type">${this._typeOptions(this._addType)}</select>
               <button class="primary" data-action="add" ${!this._entryId ? "disabled" : ""}>+ ${escapeHtml(this._t.add)}</button>
+              <button class="secondary" data-action="import" ${!this._entryId ? "disabled" : ""}>${escapeHtml(this._t.importJson)}</button>
               <button class="secondary" data-action="add-device" ${!this._entryId ? "disabled" : ""}>+ ${escapeHtml(this._t.addDevice)}</button>
             </div>
           </div>
@@ -1281,6 +1344,7 @@ class S7PLCEntityEditor extends HTMLElement {
         </section>
       </main>
 
+      <input data-action="import-file" type="file" accept=".json,application/json" hidden>
       <datalist id="entity-id-list">${Object.keys(this._hass?.states ?? {}).map((entityId) => `<option value="${escapeHtml(entityId)}"></option>`).join("")}</datalist>
       ${this._renderDialog()}
       ${this._renderDeviceDialog()}
@@ -1311,6 +1375,10 @@ class S7PLCEntityEditor extends HTMLElement {
           return;
         }
         await this._loadEntry(target.value);
+      } else if (action === "import-file") {
+        const file = target.files?.[0];
+        await this._importFile(file);
+        target.value = "";
       } else if (action === "add-type") {
         this._addType = target.value;
       } else if (action === "row-type") {
@@ -1360,6 +1428,8 @@ class S7PLCEntityEditor extends HTMLElement {
         this._markDirty();
         this._render();
         this.shadowRoot.querySelector(`[data-index="${this._rows.length - 1}"][data-copy-field="primary"]`)?.focus();
+      } else if (action === "import") {
+        this.shadowRoot.querySelector('[data-action="import-file"]')?.click();
       } else if (action === "add-device") {
         this._openDeviceDialog();
       } else if (action === "create-device") {
