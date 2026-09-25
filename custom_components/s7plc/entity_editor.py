@@ -42,10 +42,11 @@ from .const import (
 PANEL_URL_PATH = "s7plc-editor"
 PANEL_COMPONENT_NAME = "s7plc-entity-editor"
 PANEL_STATIC_URL = "/s7plc_static/entity-editor.js"
-PANEL_ASSET_VERSION = "2"
+PANEL_ASSET_VERSION = "3"
 
 WS_LIST = "s7plc/entity_editor/list"
 WS_GET = "s7plc/entity_editor/get"
+WS_IMPORT = "s7plc/entity_editor/import"
 WS_SAVE = "s7plc/entity_editor/save"
 
 _EDITOR_SETUP_MARKER = "_entity_editor_registered"
@@ -173,6 +174,99 @@ def validate_editor_rows(
     return flow._options, []  # noqa: SLF001
 
 
+def merge_import_payload(
+    entry: ConfigEntry,
+    payload: Any,
+) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]], dict[str, int]]:
+    """Merge an import payload into editor rows without removing existing items.
+
+    Existing entities win on duplicate addresses. The import only adds new,
+    valid entities and returns the merged rows for review in the editor. No
+    config entry is changed until the user presses Save.
+    """
+    stats = {"added": 0, "skipped": 0}
+    if not isinstance(payload, dict):
+        return None, [{"field": "payload", "code": "invalid_json"}], stats
+
+    flow = S7PLCOptionsFlow(entry)
+    errors: list[dict[str, Any]] = []
+    recognized_category = False
+
+    for option_key in OPTION_KEYS:
+        if option_key not in payload:
+            continue
+        recognized_category = True
+        raw_items = payload.get(option_key)
+        if raw_items is None:
+            continue
+        if not isinstance(raw_items, list):
+            errors.append(
+                {"category": option_key, "field": "payload", "code": "invalid_json"}
+            )
+            continue
+
+        for item_index, raw_item in enumerate(raw_items):
+            if not isinstance(raw_item, dict):
+                errors.append(
+                    {
+                        "category": option_key,
+                        "item": item_index,
+                        "field": "payload",
+                        "code": "invalid_json",
+                    }
+                )
+                continue
+
+            prefix = _prefix_for_item(option_key, raw_item)
+            info = ENTITY_TYPE_REGISTRY.get(prefix)
+            if info is None:
+                errors.append(
+                    {
+                        "category": option_key,
+                        "item": item_index,
+                        "field": "prefix",
+                        "code": "invalid_entity_type",
+                    }
+                )
+                continue
+
+            try:
+                builder = getattr(flow, info.item_builder_name)
+                item, item_errors = builder(dict(raw_item), skip_idx=None)
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                item = None
+                item_errors = {"base": "invalid_value"}
+
+            if item is None or item_errors:
+                code = item_errors.get("base", "invalid_value")
+                if code == "duplicate_entry":
+                    stats["skipped"] += 1
+                    continue
+                errors.append(
+                    {
+                        "category": option_key,
+                        "item": item_index,
+                        "field": "base",
+                        "code": code,
+                    }
+                )
+                continue
+
+            flow._copy_optional_fields(  # noqa: SLF001 - shared canonical validation
+                item, raw_item, CONF_DEVICE_GROUP
+            )
+            flow._options[info.option_key].append(item)  # noqa: SLF001
+            stats["added"] += 1
+
+    if not recognized_category:
+        errors.append({"field": "payload", "code": "invalid_json"})
+
+    if errors:
+        return None, errors, stats
+
+    return options_to_editor_rows(flow._options), [], stats  # noqa: SLF001
+
+
 def _device_groups(rows: Iterable[dict[str, Any]]) -> list[str]:
     groups: dict[str, str] = {}
     for row in rows:
@@ -257,6 +351,60 @@ def websocket_get_editor(
             "device_groups": _device_groups(rows),
             "device_classes": _device_class_options(),
             "revision": entity_options_revision(entry.options),
+        },
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_IMPORT,
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("payload"): dict,
+    }
+)
+@callback
+def websocket_import_editor(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Prepare an additive import for review without changing the config entry."""
+    entry = _entry_for_editor(hass, msg["entry_id"])
+    if entry is None:
+        connection.send_error(msg["id"], "entry_not_found", "S7 PLC not found")
+        return
+
+    current_revision = entity_options_revision(entry.options)
+    if msg["revision"] != current_revision:
+        connection.send_error(
+            msg["id"],
+            "stale_config",
+            "The S7 PLC configuration changed while the editor was open",
+        )
+        return
+
+    rows, errors, stats = merge_import_payload(entry, msg["payload"])
+    if rows is None:
+        connection.send_result(
+            msg["id"],
+            {
+                "imported": False,
+                "errors": errors,
+                "revision": current_revision,
+                **stats,
+            },
+        )
+        return
+
+    connection.send_result(
+        msg["id"],
+        {
+            "imported": True,
+            "rows": rows,
+            "revision": current_revision,
+            **stats,
         },
     )
 
@@ -355,6 +503,7 @@ async def async_setup_entity_editor(hass: HomeAssistant) -> None:
 
     websocket_api.async_register_command(hass, websocket_list_editors)
     websocket_api.async_register_command(hass, websocket_get_editor)
+    websocket_api.async_register_command(hass, websocket_import_editor)
     websocket_api.async_register_command(hass, websocket_save_editor)
 
     await panel_custom.async_register_panel(
