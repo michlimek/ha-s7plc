@@ -137,6 +137,8 @@ const TYPES = {
       field("scale_raw_min", "Surowe minimum", "Raw minimum", "number"),
       field("scale_raw_max", "Surowe maksimum", "Raw maximum", "number"),
       field("real_precision", "Miejsca po przecinku", "Decimal places", "integer"),
+      field("availability_address", "Adres dostępności", "Availability address"),
+      field("availability_invert", "Odwróć dostępność", "Invert availability", "checkbox"),
     ],
   },
   tx: {
