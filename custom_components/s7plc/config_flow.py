@@ -440,6 +440,8 @@ def _add_schema_number(flow) -> vol.Schema:
             vol.Optional(CONF_SCALE_RAW_MAX): scale_value_selector,
             vol.Optional(CONF_REAL_PRECISION): real_precision_selector,
             vol.Optional(CONF_SCAN_INTERVAL): scan_interval_selector,
+            vol.Optional(CONF_AVAILABILITY_ADDRESS): selector.TextSelector(),
+            vol.Optional(CONF_AVAILABILITY_INVERT, default=False): selector.BooleanSelector(),
             vol.Optional(CONF_AREA): flow._get_area_selector(),
             vol.Optional("add_another", default=False): selector.BooleanSelector(),
         }
@@ -800,10 +802,17 @@ def _edit_schema_number(flow, item: dict[str, Any]) -> vol.Schema:
         (CONF_SCALE_RAW_MAX, scale_value_selector),
         (CONF_REAL_PRECISION, real_precision_selector),
         (CONF_SCAN_INTERVAL, scan_interval_selector),
+        (CONF_AVAILABILITY_ADDRESS, selector.TextSelector()),
         (CONF_AREA, flow._get_area_selector()),
     ]:
         k, v = flow._optional_field(key, item, sel)
         d[k] = v
+    d[
+        vol.Optional(
+            CONF_AVAILABILITY_INVERT,
+            default=bool(item.get(CONF_AVAILABILITY_INVERT, False)),
+        )
+    ] = selector.BooleanSelector()
     return vol.Schema(d)
 
 
@@ -2849,6 +2858,18 @@ class S7PLCOptionsFlow(config_entries.OptionsFlow):
             item[CONF_MAX_VALUE] = max_value
         if step_value is not None:
             item[CONF_STEP] = step_value
+
+        availability_address = user_input.get(CONF_AVAILABILITY_ADDRESS)
+        if availability_address:
+            availability_address, availability_errors = self._validate_address_field(
+                availability_address
+            )
+            if availability_errors:
+                return None, availability_errors
+            item[CONF_AVAILABILITY_ADDRESS] = availability_address
+            item[CONF_AVAILABILITY_INVERT] = bool(
+                user_input.get(CONF_AVAILABILITY_INVERT, False)
+            )
 
         # Apply transformations
         self._apply_value_multiplier(item, user_input.get(CONF_VALUE_MULTIPLIER))
